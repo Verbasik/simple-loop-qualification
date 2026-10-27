@@ -1,0 +1,27 @@
+name: qualification
+on:
+  push:
+    branches: [qualification-base]
+  pull_request:
+    branches: [qualification-base]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualification-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch exact canary commit and verify
+        env:
+          QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$QUALIFICATION_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git init --quiet .
+          git remote add origin https://github.com/Verbasik/simple-loop-qualification.git
+          git -c protocol.file.allow=never fetch --no-tags --depth=1 origin "$QUALIFICATION_SHA"
+          git checkout --quiet --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+          python3 -I -c 'import json, subprocess; value=json.loads(subprocess.check_output(["python3", "-I", "probe.py"], text=True)); assert value == {"kind": "qualification_canary", "status": "ok"}; print("qualification canary passed")'
